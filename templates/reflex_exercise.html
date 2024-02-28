@@ -9,28 +9,27 @@
 
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <script>
-        $(document).ready(function() {
-            function fetchVideoData(){
-                $.getJSON('/video_data', function(data) {
-                    $('#angle_right').text(data.angle_right);
-                    $('#angle_left').text(data.angle_left);
-
-                    check_posture(data.angle_right);
-            });
+            function startExercise() {
+                // Send an AJAX request to the Flask endpoint
+                var xhr = new XMLHttpRequest();
+                xhr.open("POST", "/catch_disk_video", true);
+                xhr.setRequestHeader("Content-Type", "application/json");
+                xhr.onreadystatechange = function () {
+                    if (xhr.readyState === XMLHttpRequest.DONE) {
+                        if (xhr.status === 200) {
+                            // Handle success
+                            console.log("Exercise started successfully");
+                        } else {
+                            // Handle error
+                            console.error("Error starting exercise");
+                        }
+                    }
+                };
+                xhr.send();
             }
 
-            function check_posture(angle){
-                if (angle < 90){
-                    error_elbow = true;
-                    $('#feedback').text('Stretch your arm out and lift it away from your body.');
-                }
-                else{
-                    $('#feedback').text('Good job.');
-                }
-            }
 
-            setInterval(fetchVideoData, 50);
-        });
+            //setInterval(fetchVideoData, 50);
     </script>
 
 </head>
@@ -43,20 +42,22 @@
                     <ul class="actions">
                         <li><a href="\" class="button">Go back</a></li>
                     </ul>
-                    <h1>Forehand throw</h1>
-                            <p>Make your position to throw forehand, throw without throwing the frisbee. Try to focus on the movement before releasing the frisb</p>
+                    <h1>Reflex exercise</h1>
+                            <p>A frisbee will appear in the projected image, grab the frisbee using both hands as in the tutorial.</p>
                     <div class="image">
-                        <img>
                     </div>
                     <div class="content-wrapper">
-                        <div class="image">
-                            <img src="{{url_for('video_feed')}}">
-                        </div>
                         <!--TODO: add different types of input-->
+                        <div class="image">
+                            <img src="{{url_for('catch_disk_video')}}">
+                        </div>
                         <div class="text">
                             <h2>Feedback</h2>
                             <p><span id="feedback">--</span></p>
                         </div>
+                        <ul class="actions">
+                            <li><a onclick="startExercise()" class="button">Start</a></li>
+                        </ul>
                         
                     </div>
                 </div>
