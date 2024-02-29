@@ -5,6 +5,9 @@ import cv2
 import mediapipe as mp
 import forehand_detector as throws_fun
 import numpy as np
+import time
+import random
+import math
 
 # Create flask
 app = Flask(__name__, static_folder='templates/static')
@@ -23,6 +26,7 @@ mp_pose = mp.solutions.pose
 angle_right = 0
 angle_left = 0
 error_arm = False
+n_throws_global = 0
 
 def generate():
     with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
@@ -66,7 +70,7 @@ def generate():
                 # calculate angle
                 angle_right = throws_fun.calculate_angle(shoulder_right, elbow_right, wrist_right)
                 angle_left = throws_fun.calculate_angle(shoulder_left, elbow_left, wrist_left)
-                
+            
             except Exception as e:
                 arm_visible = False
                 print(f"Error: {e}")
@@ -89,11 +93,17 @@ def generate():
             yield(b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
 
 
-def draw_frisbee():
+def draw_frisbee(n_exercises = 1):
+
+    if n_throws_global is not None:
+        n_exercises = n_throws_global
     # generate a random x and y position to center the disk
     # define a limit time
-    # define a number of throws to practice
+    # [x] define a number of throws to practice
     # paint 3, 2, 1 over the screen
+    disk_caught = False
+
+    print("n_exercise: ", n_exercises)
     with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
         while cap.isOpened():
             # Read a frame from the video
@@ -112,6 +122,12 @@ def draw_frisbee():
             image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             # set the image to not be modified and save memory
             image.flags.writeable = False
+            image = cv2.flip(image, 1) # mirror effect
+
+            if not disk_caught:
+                disk_x = int(round(random.random() * image.shape[1]))
+                disk_y = int(round(random.random() * image.shape[0]))
+                disk_caught = True
             
             # Make detection
             results = pose.process(image) # get detection of pose
@@ -120,24 +136,41 @@ def draw_frisbee():
             image.flags.writeable = True
             image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
-            """
+            
             try:
                 landmarks = results.pose_landmarks.landmark
-                shoulder_right = [landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x, landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y]
-                elbow_right = [landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].x, landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].y]
-                wrist_right = [landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].x, landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].y]
-                
-                shoulder_left = [landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].x, landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y]
-                elbow_left = [landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].x, landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].y]
-                wrist_left = [landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].x, landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].y]
-                
             except Exception as e:
                 print(f"Error: {e}")
                 pass
-            
-            mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
-            """
 
+
+            right_wrist_landmarks = [landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].x, landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].y]
+            left_wrist_landmarks = [landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].x, landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].y]
+            mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
+
+            image = cv2.circle(image, (disk_x, disk_y), radius=10, color=(0, 255, 0), thickness=-1)
+            
+            # check upper hand is right
+            r_wrist_x = right_wrist_landmarks[0] * image.shape[1]
+            l_wrist_x = left_wrist_landmarks[0] * image.shape[1]
+            
+            r_wrist_y = right_wrist_landmarks[1] * image.shape[0]
+            l_wrist_y = left_wrist_landmarks[1] * image.shape[0]
+            
+            condition_y_axis_right = r_wrist_y > l_wrist_y
+            condition_visibility_points = landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].visibility > 0.4 and landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].visibility > 0.4
+            condition_distance = ((r_wrist_x - l_wrist_x) < 20) and ((r_wrist_x - l_wrist_x) > -20)
+            
+            #distance to the disk, taking as reference right wrist landmark
+            distance_disk_wrist = math.sqrt((r_wrist_x - disk_x)**2 + (r_wrist_y - disk_y)**2)
+            condition_disk = distance_disk_wrist < 30
+            
+            
+            if condition_y_axis_right and condition_visibility_points and condition_distance and condition_disk:
+                disk_x = int(round(random.random() * image.shape[1]))
+                disk_y = int(round(random.random() * image.shape[0]))
+            
+            # Encode the image
             if ret:
                 (flag, encodedImage) = cv2.imencode(".jpeg", image)
 
@@ -165,26 +198,30 @@ def exercise_forehand():
 def video_feed():
     return Response(generate(), mimetype="multipart/x-mixed-replace; boundary=frame")
 
-@app.route("/catch_disk_video", methods=["GET", "POST"])
+
+@app.route("/catch_disk_video")
 def catch_disk_video():
-    if request.method == "POST":
-        # If it's a POST request, start the exercise
-        start_exercise()
-        return jsonify({"message": "Exercise started"}), 200
-    else:
-        # If it's a GET request, return the video feed
-        return Response(draw_frisbee(), mimetype="multipart/x-mixed-replace; boundary=frame")
+    return Response(draw_frisbee(), mimetype="multipart/x-mixed-replace; boundary=frame")
+        
 
 @app.route("/exercise_reflex")
 def exercise_reflex():
     return render_template("reflex_exercise.html")
 
+def define_parameters_exercise(n_throws):
+    global n_throws_global
+    if n_throws_global is not None:
+        n_throws_global = n_throws
+
 # Function to start the exercise
+@app.route('/start-exercise', methods=['POST'])
 def start_exercise():
     # Add your code here to start the exercise
     # For example, you can set a global variable to track whether the exercise has started
-    global exercise_started
-    exercise_started = True
+    data = request.json
+    n_throws = data.get('n_throws')
+    define_parameters_exercise(n_throws)
+    return jsonify({'n_throws': n_throws}), 200
 
 #debug updates programs
 if __name__ == "__main__":
