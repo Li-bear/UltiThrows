@@ -28,6 +28,9 @@ angle_left = 0
 error_arm = False
 n_throws_global = 0
 
+# exercise reflex
+caught_n_frisbee = 0
+
 def generate():
     with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
         while cap.isOpened():
@@ -47,6 +50,7 @@ def generate():
             image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             # set the image to not be modified and save memory
             image.flags.writeable = False
+            image = cv2.flip(image, 1) # mirror effect
             
             # Make detection
             results = pose.process(image) # get detection of pose
@@ -93,19 +97,24 @@ def generate():
             yield(b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
 
 
-def draw_frisbee(n_exercises = 1):
-
-    if n_throws_global is not None:
-        n_exercises = n_throws_global
+def draw_frisbee(n_exercises = 5):
+    #if n_throws_global is not None:
+    #    n_exercises = n_throws_global
+    
     # generate a random x and y position to center the disk
     # define a limit time
     # [x] define a number of throws to practice
     # paint 3, 2, 1 over the screen
-    disk_caught = False
 
+    disk_caught = False
+    draw_landmarks = False
+    global caught_n_frisbee
+    caught_n_frisbee = 0
     print("n_exercise: ", n_exercises)
+    
     with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
-        while cap.isOpened():
+        while caught_n_frisbee < n_exercises:
+        #while cap.isOpened(): #cap.isOpened():
             # Read a frame from the video
             # ret -> return variable
             # frame -> image from cap
@@ -125,9 +134,11 @@ def draw_frisbee(n_exercises = 1):
             image = cv2.flip(image, 1) # mirror effect
 
             if not disk_caught:
-                disk_x = int(round(random.random() * image.shape[1]))
-                disk_y = int(round(random.random() * image.shape[0]))
+                width, height = image.shape[1], image.shape[0]
+                disk_x = random.randint(math.trunc(width * 0.10), math.trunc(width * 0.90))
+                disk_y = random.randint(math.trunc(height * 0.10), math.trunc(height * 0.90))
                 disk_caught = True
+
             
             # Make detection
             results = pose.process(image) # get detection of pose
@@ -135,41 +146,44 @@ def draw_frisbee(n_exercises = 1):
             # Recolor back to BGR for opencv
             image.flags.writeable = True
             image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-
             
             try:
                 landmarks = results.pose_landmarks.landmark
+                
+                right_wrist_landmarks = [landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].x, landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].y]
+                left_wrist_landmarks = [landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].x, landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].y]
+                mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
+                
+
+                image = cv2.circle(image, (disk_x, disk_y), radius=10, color=(0, 255, 0), thickness=-1)
+                
+                # check upper hand is right
+                r_wrist_x = right_wrist_landmarks[0] * image.shape[1]
+                l_wrist_x = left_wrist_landmarks[0] * image.shape[1]
+                
+                r_wrist_y = right_wrist_landmarks[1] * image.shape[0]
+                l_wrist_y = left_wrist_landmarks[1] * image.shape[0]
+                
+                condition_y_axis_right = r_wrist_y > l_wrist_y
+                condition_visibility_points = landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].visibility > 0.4 and landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].visibility > 0.4
+                condition_distance = ((r_wrist_x - l_wrist_x) < 20) and ((r_wrist_x - l_wrist_x) > -20)
+                
+                # distance to the disk, taking as reference right wrist landmark
+                distance_disk_wrist = math.sqrt((r_wrist_x - disk_x)**2 + (r_wrist_y - disk_y)**2)
+                condition_disk = distance_disk_wrist < 30
+                
+                    
+                if condition_y_axis_right and condition_visibility_points and condition_distance and condition_disk:
+                    disk_x = random.randint(math.trunc(width * 0.10), math.trunc(width * 0.90))
+                    disk_y = random.randint(math.trunc(height * 0.10), math.trunc(height * 0.90))
+                    #disk_caught = True
+                    #disk_caught = False
+                    caught_n_frisbee += 1
+            
             except Exception as e:
-                print(f"Error: {e}")
+                print(f"Error {e}")
                 pass
 
-
-            right_wrist_landmarks = [landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].x, landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].y]
-            left_wrist_landmarks = [landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].x, landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].y]
-            mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
-
-            image = cv2.circle(image, (disk_x, disk_y), radius=10, color=(0, 255, 0), thickness=-1)
-            
-            # check upper hand is right
-            r_wrist_x = right_wrist_landmarks[0] * image.shape[1]
-            l_wrist_x = left_wrist_landmarks[0] * image.shape[1]
-            
-            r_wrist_y = right_wrist_landmarks[1] * image.shape[0]
-            l_wrist_y = left_wrist_landmarks[1] * image.shape[0]
-            
-            condition_y_axis_right = r_wrist_y > l_wrist_y
-            condition_visibility_points = landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].visibility > 0.4 and landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].visibility > 0.4
-            condition_distance = ((r_wrist_x - l_wrist_x) < 20) and ((r_wrist_x - l_wrist_x) > -20)
-            
-            #distance to the disk, taking as reference right wrist landmark
-            distance_disk_wrist = math.sqrt((r_wrist_x - disk_x)**2 + (r_wrist_y - disk_y)**2)
-            condition_disk = distance_disk_wrist < 30
-            
-            
-            if condition_y_axis_right and condition_visibility_points and condition_distance and condition_disk:
-                disk_x = int(round(random.random() * image.shape[1]))
-                disk_y = int(round(random.random() * image.shape[0]))
-            
             # Encode the image
             if ret:
                 (flag, encodedImage) = cv2.imencode(".jpeg", image)
@@ -208,10 +222,16 @@ def catch_disk_video():
 def exercise_reflex():
     return render_template("reflex_exercise.html")
 
+"""
 def define_parameters_exercise(n_throws):
     global n_throws_global
     if n_throws_global is not None:
         n_throws_global = n_throws
+"""
+
+@app.route('/get_caught_n_frisbee')
+def get_caught_n_frisbee():
+    return jsonify({"caught_n_frisbee": caught_n_frisbee})
 
 # Function to start the exercise
 @app.route('/start-exercise', methods=['POST'])
@@ -220,7 +240,7 @@ def start_exercise():
     # For example, you can set a global variable to track whether the exercise has started
     data = request.json
     n_throws = data.get('n_throws')
-    define_parameters_exercise(n_throws)
+    #define_parameters_exercise(n_throws)
     return jsonify({'n_throws': n_throws}), 200
 
 #debug updates programs

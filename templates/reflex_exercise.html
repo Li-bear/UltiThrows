@@ -9,28 +9,60 @@
 
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <script>
-            function startExercise() {
-                // Send an AJAX request to the Flask endpoint
-                var xhr = new XMLHttpRequest();
-                xhr.open("POST", "/catch_disk_video", true);
-                xhr.setRequestHeader("Content-Type", "application/json");
-                xhr.onreadystatechange = function () {
-                    if (xhr.readyState === XMLHttpRequest.DONE) {
-                        if (xhr.status === 200) {
-                            // Handle success
-                            console.log("Exercise started successfully");
-                        } else {
-                            // Handle error
-                            console.error("Error starting exercise");
-                        }
+        function startExercise() {
+            /*
+            // Convert the value to JSON string
+            var n_throws = document.getElementById("n_throws").value;
+            var data = JSON.stringify({ "n_throws": n_throws });
+    
+            // Send an AJAX request to the Flask endpoint
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/start-exercise", true);
+            xhr.setRequestHeader("Content-Type", "application/json");
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState === XMLHttpRequest.DONE) {
+                    if (xhr.status === 200) {
+                        // Handle success
+                        console.log("Exercise started successfully");
+                    } else {
+                        // Handle error
+                        console.error("Error starting exercise");
                     }
-                };
-                xhr.send();
-            }
+                }
+            };
+            xhr.send(data);
+            */
 
-
-            //setInterval(fetchVideoData, 50);
+            document.getElementById("imageContainer").style.display = 'block';
+        }
     </script>
+
+    <script>
+        function fetchFrisbeeData(){
+            fetch('/get_caught_n_frisbee')
+            .then(response => response.json())
+            .then(data => {
+                $('#feedback').text(data.caught_n_frisbee);
+                isGameON(data.caught_n_frisbee);  
+            })
+
+        };
+
+        function isGameON(n){
+            if (n > 5 && !isContainerHidden)
+            {
+                document.getElementById("imageContainer").style.display = 'none';
+                isContainerHidden = true;
+            }
+            else if (n == 5)
+            {
+                $('#feedback').text("Congratulations you caught n frisbee");
+            }
+        }
+
+        setInterval(fetchFrisbeeData, 10);
+    </script>
+    
 
 </head>
 <body class="is-preload">
@@ -46,18 +78,21 @@
                             <p>A frisbee will appear in the projected image, grab the frisbee using both hands as in the tutorial.</p>
                     <div class="image">
                     </div>
+                    <input type="number" id="n_throws" name="n_throws" min="1" max="10" step="1" style="color: black;">
+
+                    <ul class="actions">
+                        <li><a onclick="startExercise()" class="button">Start</a></li>
+                    </ul>
+
                     <div class="content-wrapper">
                         <!--TODO: add different types of input-->
-                        <div class="image">
-                            <img src="{{url_for('catch_disk_video')}}">
+                        <div class="image" id="imageContainer" style="display: none;">
+                            <img id ="videoFeed" src="{{url_for('catch_disk_video')}}">
                         </div>
                         <div class="text">
                             <h2>Feedback</h2>
                             <p><span id="feedback">--</span></p>
                         </div>
-                        <ul class="actions">
-                            <li><a onclick="startExercise()" class="button">Start</a></li>
-                        </ul>
                         
                     </div>
                 </div>
