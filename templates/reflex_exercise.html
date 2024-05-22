@@ -9,58 +9,47 @@
 
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
     <script>
+        let startTime,endTime, timeElapsed = 0;
+
         function startExercise() {
-            /*
-            // Convert the value to JSON string
-            var n_throws = document.getElementById("n_throws").value;
-            var data = JSON.stringify({ "n_throws": n_throws });
-    
-            // Send an AJAX request to the Flask endpoint
-            var xhr = new XMLHttpRequest();
-            xhr.open("POST", "/start-exercise", true);
-            xhr.setRequestHeader("Content-Type", "application/json");
-            xhr.onreadystatechange = function () {
-                if (xhr.readyState === XMLHttpRequest.DONE) {
-                    if (xhr.status === 200) {
-                        // Handle success
-                        console.log("Exercise started successfully");
-                    } else {
-                        // Handle error
-                        console.error("Error starting exercise");
-                    }
-                }
-            };
-            xhr.send(data);
-            */
-
-            document.getElementById("imageContainer").style.display = 'block';
+            $.get('/reset_exercise', function(data) {
+                console.log(data.status);
+                document.getElementById("imageContainer").style.display = 'block';
+                startTime = new Date();
+                $('#feedback').text('--');
+                $('#timer').text('--');
+            });
         }
-    </script>
-
-    <script>
         function fetchFrisbeeData(){
             fetch('/get_caught_n_frisbee')
             .then(response => response.json())
             .then(data => {
                 $('#feedback').text(data.caught_n_frisbee);
-                isGameON(data.caught_n_frisbee);  
+                isGameON(data.caught_n_frisbee);         
             })
-
         };
 
         function isGameON(n){
-            if (n > 5 && !isContainerHidden)
-            {
+           if (n >= 5)
+           {
                 document.getElementById("imageContainer").style.display = 'none';
                 isContainerHidden = true;
+                endTime = new Date();
+                timeElapsed = endTime - startTime;
+                let minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+                let seconds = Math.floor(timeElapsed / 1000);
+                $('#feedback').text("Congratulations you caught 5 points!");
             }
-            else if (n == 5)
+            else if (n < 5)
             {
-                $('#feedback').text("Congratulations you caught n frisbee");
+                endTime = new Date();
+                timeElapsed = endTime - startTime;
+                let seconds = Math.floor((timeElapsed % (1000 * 60)) / 1000);
+                $('#timer').text(seconds);
             }
         }
 
-        setInterval(fetchFrisbeeData, 10);
+        setInterval(fetchFrisbeeData, 500);
     </script>
     
 
@@ -76,9 +65,13 @@
                     </ul>
                     <h1>Reflex exercise</h1>
                             <p>A frisbee will appear in the projected image, grab the frisbee using both hands as in the tutorial.</p>
+                            <p>The exercise will stop after 5 iterations</p>
                     <div class="image">
                     </div>
-                    <input type="number" id="n_throws" name="n_throws" min="1" max="10" step="1" style="color: black;">
+                    <!--
+
+                        <input type="number" id="n_throws" name="n_throws" min="1" max="10" step="1" style="color: black;">
+                    -->
 
                     <ul class="actions">
                         <li><a onclick="startExercise()" class="button">Start</a></li>
@@ -92,6 +85,8 @@
                         <div class="text">
                             <h2>Feedback</h2>
                             <p><span id="feedback">--</span></p>
+                            <h2>Time</h2>
+                            <p><span id="timer">--</span></p>
                         </div>
                         
                     </div>

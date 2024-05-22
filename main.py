@@ -30,6 +30,7 @@ n_throws_global = 0
 
 # exercise reflex
 caught_n_frisbee = 0
+active_timer = time.time()
 
 def generate():
     with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
@@ -98,9 +99,7 @@ def generate():
 
 
 def draw_frisbee(n_exercises = 5):
-    #if n_throws_global is not None:
-    #    n_exercises = n_throws_global
-    
+  
     # generate a random x and y position to center the disk
     # define a limit time
     # [x] define a number of throws to practice
@@ -110,11 +109,11 @@ def draw_frisbee(n_exercises = 5):
     draw_landmarks = False
     global caught_n_frisbee
     caught_n_frisbee = 0
-    print("n_exercise: ", n_exercises)
     
     with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
-        while caught_n_frisbee < n_exercises:
-        #while cap.isOpened(): #cap.isOpened():
+        active_timer = time.time()
+
+        while cap.isOpened(): #cap.isOpened():
             # Read a frame from the video
             # ret -> return variable
             # frame -> image from cap
@@ -176,8 +175,6 @@ def draw_frisbee(n_exercises = 5):
                 if condition_y_axis_right and condition_visibility_points and condition_distance and condition_disk:
                     disk_x = random.randint(math.trunc(width * 0.10), math.trunc(width * 0.90))
                     disk_y = random.randint(math.trunc(height * 0.10), math.trunc(height * 0.90))
-                    #disk_caught = True
-                    #disk_caught = False
                     caught_n_frisbee += 1
             
             except Exception as e:
@@ -192,6 +189,8 @@ def draw_frisbee(n_exercises = 5):
                 continue
             yield(b'--frame\r\n' b'Content-Type: image/jpeg\r\n\r\n' + bytearray(encodedImage) + b'\r\n')
 
+
+# TODO: add timer
 
 @app.route("/video_data")
 def video_data():
@@ -222,26 +221,15 @@ def catch_disk_video():
 def exercise_reflex():
     return render_template("reflex_exercise.html")
 
-"""
-def define_parameters_exercise(n_throws):
-    global n_throws_global
-    if n_throws_global is not None:
-        n_throws_global = n_throws
-"""
-
 @app.route('/get_caught_n_frisbee')
 def get_caught_n_frisbee():
     return jsonify({"caught_n_frisbee": caught_n_frisbee})
 
-# Function to start the exercise
-@app.route('/start-exercise', methods=['POST'])
-def start_exercise():
-    # Add your code here to start the exercise
-    # For example, you can set a global variable to track whether the exercise has started
-    data = request.json
-    n_throws = data.get('n_throws')
-    #define_parameters_exercise(n_throws)
-    return jsonify({'n_throws': n_throws}), 200
+@app.route('/reset_exercise')
+def reset_exercise():
+    global caught_n_frisbee
+    caught_n_frisbee = 0
+    return jsonify({"status": "Exercise reset successfully"})
 
 #debug updates programs
 if __name__ == "__main__":
